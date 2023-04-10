@@ -4,15 +4,23 @@
 #define WEBPORT 9999
 class pcwebserver {
  public:
+  std::vector<crow::json::wvalue> parseversions(std::vector<version> vers){
+    std::vector<crow::json::wvalue> temp_json;
+    temp_json.resize(vers.size());
+    for (int i = 0; i < vers.size(); i++) {
+      temp_json[i]["cl"] = vers[i].cl_version;
+      temp_json[i]["sv_save"] = vers[i].sv_save_version;
+      temp_json[i]["sv_local"] = vers[i].sv_local_version;
+      std::cout << temp_json[i].dump() << "\n";
+    }
+    return std::move(temp_json);
+  }
   pcwebserver() {
     crow::mustache::set_global_base("./web");
+    ctx_sv_local_versions["versions"]=std::move(parseversions(db.sv_local_getversions()));
+    ctx_sv_save_versions["versions"]=std::move(parseversions(db.sv_save_getversions()));
+    ctx_cl_versions["versions"]=std::move(parseversions(db.cl_getversions()));
     initcontrollers();
-    sv_local_versions = db.sv_local_getversions();
-    json_local_version.resize(sv_local_versions.size());
-    for (int i = 0; i < sv_local_versions.size(); i++) {
-      json_local_version[i]["version"] = sv_local_versions[i];
-      std::cout << json_local_version[i].dump() << "\n";
-    }
   }
   void start() { app.port(WEBPORT).run(); }
   void stop() {}
@@ -21,17 +29,27 @@ class pcwebserver {
     ([]() { return "HELLO\n"; });
     CROW_ROUTE(app, "/api/sv_local/getversion")
     ([this] {
-      crow::mustache::context ctx;
-      ctx["versions"] = sv_local_versions;
-      return crow::mustache::load("api/version.html").render(ctx);
+        return crow::mustache::load("api/versionsvlocal.html").render(ctx_sv_local_versions);
+    });
+    CROW_ROUTE(app, "/api/sv_save/getversion")
+    ([this] {
+        return crow::mustache::load("api/versionsvsave.html").render(ctx_sv_save_versions);
+    });
+    CROW_ROUTE(app, "/api/cl/getversion")
+    ([this] {
+        return crow::mustache::load("api/versioncl.html").render(ctx_cl_versions);
     });
   }
 
   ~pcwebserver() { stop(); }
+public:
 
  private:
   database db;
-  std::vector<std::string> sv_local_versions;
-  std::vector<crow::json::wvalue> json_local_version;
+  crow::mustache::context ctx_sv_local_versions;
+  crow::mustache::context ctx_sv_save_versions;
+  crow::mustache::context ctx_cl_versions;
+  std::vector<version> temp_versions;
+ 
   crow::SimpleApp app;
 };
